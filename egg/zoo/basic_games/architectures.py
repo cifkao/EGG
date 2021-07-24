@@ -5,6 +5,7 @@
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 # In EGG, the game designer must implement the core functionality of the Sender and Receiver agents. These are then
 # embedded in wrappers that are used to train them to play Gumbel-Softmax- or Reinforce-optimized games. The core
@@ -53,3 +54,29 @@ class Sender(nn.Module):
     def forward(self, x, _aux_input):
         return self.fc1(x)
         # here, it might make sense to add a non-linearity, such as tanh
+
+
+class SumSender(nn.Module):
+    def __init__(self, n_hidden, n_features, vocab_size, n_layers=1):
+        super(SumSender, self).__init__()
+        layers = [nn.Linear(n_features, n_hidden if n_layers > 1 else vocab_size)]
+        for i in range(1, n_layers):
+            layers.append(nn.ELU())
+            layers.append(nn.Linear(n_hidden, n_hidden if i < n_layers - 1 else vocab_size))
+        self.net = nn.Sequential(*layers)
+
+    def forward(self, x, _aux_input):
+        return self.net(x)
+
+class SumReceiver(nn.Module):
+    def __init__(self, n_features, n_hidden, n_layers=1):
+        super(SumReceiver, self).__init__()
+        layers = []
+        for _ in range(n_layers - 1):
+            layers.append(nn.Linear(n_hidden, n_hidden))
+            layers.append(nn.ELU())
+        layers.append(nn.Linear(n_hidden, n_features))
+        self.net = nn.Sequential(*layers)
+
+    def forward(self, x, _input, _aux_input):
+        return self.net(x)

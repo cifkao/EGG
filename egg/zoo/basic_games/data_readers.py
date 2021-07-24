@@ -5,6 +5,7 @@
 
 import numpy as np
 import torch
+import torch.nn.functional as F
 from torch.utils.data import Dataset
 
 # These input-data-processing classes take input data from a text file and convert them to the format
@@ -33,6 +34,27 @@ class AttValRecoDataset(Dataset):
                 z[i, config[i]] = 1
             label = torch.tensor(list(map(int, row)))
             self.frame.append((z.view(-1), label))
+
+    def get_n_features(self):
+        return self.frame[0][0].size(0)
+
+    def __len__(self):
+        return len(self.frame)
+
+    def __getitem__(self, idx):
+        return self.frame[idx]
+
+
+# The AttrValClass class is used in the summation game. It's like AttrValRecoDataset, but the last
+# item is used as the (single) class label.
+class AttrValClassDataset(Dataset):
+    def __init__(self, path, n_values):
+        data = np.loadtxt(path, dtype=int)
+        self.frame = []
+        for *inputs, label in data:
+            inputs = torch.tensor(inputs)
+            z = F.one_hot(inputs, num_classes=n_values).view(-1).float()
+            self.frame.append((z, torch.tensor(label)))
 
     def get_n_features(self):
         return self.frame[0][0].size(0)
