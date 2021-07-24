@@ -57,12 +57,12 @@ class Sender(nn.Module):
 
 
 class SumSender(nn.Module):
-    def __init__(self, n_hidden, n_features, vocab_size, n_layers=1):
+    def __init__(self, n_hidden, n_features, n_output, n_layers=1):
         super(SumSender, self).__init__()
-        layers = [nn.Linear(n_features, n_hidden if n_layers > 1 else vocab_size)]
+        layers = [nn.Linear(n_features, n_hidden if n_layers > 1 else n_output)]
         for i in range(1, n_layers):
             layers.append(nn.ELU())
-            layers.append(nn.Linear(n_hidden, n_hidden if i < n_layers - 1 else vocab_size))
+            layers.append(nn.Linear(n_hidden, n_hidden if i < n_layers - 1 else n_output))
         self.net = nn.Sequential(*layers)
 
     def forward(self, x, _aux_input):

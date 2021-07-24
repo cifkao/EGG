@@ -83,14 +83,43 @@ def get_params(params):
     parser.add_argument(
         "--sender_layers",
         type=int,
-        default=2,
+        default=1,
         help="Number of hidden layers of Sender (default: 2)",
     )
     parser.add_argument(
         "--receiver_layers",
         type=int,
-        default=2,
+        default=1,
         help="Number of hidden layers of Receiver (default: 2)",
+    )
+    parser.add_argument(
+        "--rnn",
+        action="store_true",
+        help="Use RNN game instead of single-symbol game",
+    )
+    parser.add_argument(
+        "--sender_cell",
+        type=str,
+        default="rnn",
+        help="Type of the cell used for Sender {rnn, gru, lstm} (default: rnn)",
+    )
+    parser.add_argument(
+        "--receiver_cell",
+        type=str,
+        default="rnn",
+        help="Type of the cell used for Receiver {rnn, gru, lstm} (default: rnn)",
+    )
+    parser.add_argument(
+        "--sender_embedding",
+        type=int,
+        default=10,
+        help="Output dimensionality of the layer that embeds symbols produced at previous step in Sender (default: 10)",
+    )
+    parser.add_argument(
+        "--receiver_embedding",
+        type=int,
+        default=10,
+        help="Output dimensionality of the layer that embeds the message symbols for Receiver (default: 10)",
     )
     # arguments controlling the script output
     parser.add_argument(
@@ -154,11 +183,13 @@ def main(params, opts=None, train=False):
             num_workers=1,
         )
 
-    # now the sender and receiver agents. let's make them deeper since we don't have the RNN
+    # now the sender and receiver agents. we have the option to make them deeper if we don't use the RNN
     sender = SumSender(
         n_features=n_features,
         n_hidden=opts.sender_hidden,
-        vocab_size=opts.vocab_size,
+        # if we are going to use the RNN wrapper, we output sender_hidden units, otherwise we
+        # directly project to vocab_size dimensions for symbol prediction
+        n_output=opts.sender_hidden if opts.rnn else opts.vocab_size,
         n_layers=opts.sender_layers
     )
     receiver = SumReceiver(
@@ -172,15 +203,18 @@ def main(params, opts=None, train=False):
     # the Receiver wrapper takes the symbol produced by the Sender, embeds it and feeds it to the
     # core Receiver architecture we defined above (possibly with other Receiver input, as determined by the core architecture)
     # to generate the output.
-    # here we use SymbolReceiverWrapper, which is compatible both with Gumbel-Softmax and Reinforce
-    receiver = core.SymbolReceiverWrapper(
-        receiver,
-        vocab_size=opts.vocab_size,
-        agent_input_size=opts.receiver_hidden
-    )
+    if not opts.rnn:
+        # here we use SymbolReceiverWrapper, which is compatible both with Gumbel-Softmax and Reinforce
+        receiver = core.SymbolReceiverWrapper(
+            receiver,
+            vocab_size=opts.vocab_size,
+            agent_input_size=opts.receiver_hidden
+        )
 
     # the implementation differs slightly depending on whether communication is optimized via Gumbel-Softmax ('gs') or Reinforce ('rf', default)
     if opts.mode.lower() == "gs":
+        if opts.rnn:
+            raise NotImplementedError()
         # in the following lines, we embed the Sender and Receiver architectures into standard EGG wrappers that are appropriate for Gumbel-Softmax optimization
         # the Sender wrapper takes the hidden layer produced by the core agent architecture we defined above when processing input, and samples a symbol
         # using Gumbel-Softmax
@@ -194,17 +228,39 @@ def main(params, opts=None, train=False):
         # after each epoch
         callbacks = [core.TemperatureUpdater(agent=sender, decay=0.9, minimum=0.1)]
     else:  # NB: any other string than gs will lead to rf training!
-        # here, the interesting thing to note is that we use the same core architectures we defined above, but now we embed them in wrappers that are suited to
-        # Reinforce-based optmization
-        sender = core.ReinforceWrapper(sender)
-        receiver = core.ReinforceDeterministicWrapper(receiver)
-        game = core.SymbolGameReinforce(
-            sender,
-            receiver,
-            loss,
-            sender_entropy_coeff=opts.sender_entropy_coeff,
-            receiver_entropy_coeff=0,
-        )
+        if opts.rnn:
+            sender = core.RnnSenderReinforce(
+                sender,
+                vocab_size=opts.vocab_size,
+                embed_dim=opts.sender_embedding,
+                hidden_size=opts.sender_hidden,
+                cell=opts.sender_cell,
+                max_len=opts.max_len,
+            )
+            receiver = core.RnnReceiverDeterministic(
+                receiver,
+                vocab_size=opts.vocab_size,
+                embed_dim=opts.receiver_embedding,
+                hidden_size=opts.receiver_hidden,
+                cell=opts.receiver_cell,
+            )
+            game = core.SenderReceiverRnnReinforce(
+                sender,
+                receiver,
+                loss,
+                sender_entropy_coeff=opts.sender_entropy_coeff,
+                receiver_entropy_coeff=0,
+            )
+        else:
+            sender = core.ReinforceWrapper(sender)
+            receiver = core.ReinforceDeterministicWrapper(receiver)
+            game = core.SymbolGameReinforce(
+                sender,
+                receiver,
+                loss,
+                sender_entropy_coeff=opts.sender_entropy_coeff,
+                receiver_entropy_coeff=0,
+            )
         callbacks = []
 
     # we are almost ready to train: we define here an optimizer calling standard pytorch functionality
