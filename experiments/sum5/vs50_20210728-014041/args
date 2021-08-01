@@ -1,0 +1,1 @@
+--mode rf --lr 0.001 --vocab_size 50 --n_values 5 --sender_hidden 100 --sender_layers 2 --receiver_hidden 100 --receiver_layers 2 --train_data ../../data/sum5.train.train --validation_data ../../data/sum5.train.val --n_epochs 1000 --validation_freq 20 --tensorboard --tensorboard_dir vs50_20210728-014041 --checkpoint_dir vs50_20210728-014041
