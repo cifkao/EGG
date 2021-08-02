@@ -201,8 +201,7 @@ def main(params, opts=None, train=False):
     # now, we instantiate the full sender and receiver architectures, and connect them and the loss into a game object
 
     # the Receiver wrapper takes the symbol produced by the Sender, embeds it and feeds it to the
-    # core Receiver architecture we defined above (possibly with other Receiver input, as determined by the core architecture)
-    # to generate the output.
+    # core Receiver architecture we defined above to generate the output.
     if not opts.rnn:
         # here we use SymbolReceiverWrapper, which is compatible both with Gumbel-Softmax and Reinforce
         receiver = core.SymbolReceiverWrapper(
@@ -215,19 +214,13 @@ def main(params, opts=None, train=False):
     if opts.mode.lower() == "gs":
         if opts.rnn:
             raise NotImplementedError()
-        # in the following lines, we embed the Sender and Receiver architectures into standard EGG wrappers that are appropriate for Gumbel-Softmax optimization
-        # the Sender wrapper takes the hidden layer produced by the core agent architecture we defined above when processing input, and samples a symbol
-        # using Gumbel-Softmax
         sender = core.GumbelSoftmaxWrapper(
             sender,
             temperature=opts.temperature,
         )
         game = core.SymbolGameGS(sender, receiver, loss)
-        # callback functions can be passed to the trainer object (see below) to operate at certain steps of training and validation
-        # for example, the TemperatureUpdater (defined in callbacks.py in the core directory) will update the Gumbel-Softmax temperature hyperparameter
-        # after each epoch
         callbacks = [core.TemperatureUpdater(agent=sender, decay=0.9, minimum=0.1)]
-    else:  # NB: any other string than gs will lead to rf training!
+    else:
         if opts.rnn:
             sender = core.RnnSenderReinforce(
                 sender,
@@ -268,9 +261,6 @@ def main(params, opts=None, train=False):
     # in the following statement, we finally instantiate the trainer object with all the components we defined (the game, the optimizer, the data
     # and the callbacks)
     if opts.print_validation_events == True:
-        # we add a callback that will print loss and accuracy after each training and validation pass (see ConsoleLogger in callbacks.py in core directory)
-        # if requested by the user, we will also print a detailed log of the validation pass after full training: look at PrintValidationEvents in
-        # language_analysis.py (core directory)
         trainer = core.Trainer(
             game=game,
             optimizer=optimizer,
