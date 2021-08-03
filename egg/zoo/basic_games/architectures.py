@@ -56,6 +56,8 @@ class Sender(nn.Module):
         # here, it might make sense to add a non-linearity, such as tanh
 
 
+# SumSender and SumReceiver are similar, but can have multiple layers
+
 class SumSender(nn.Module):
     def __init__(self, n_hidden, n_features, n_output, n_layers=1):
         super(SumSender, self).__init__()

@@ -222,7 +222,7 @@ def main(params, opts=None, train=False):
         game = core.SymbolGameGS(sender, receiver, loss)
         callbacks = [core.TemperatureUpdater(agent=sender, decay=0.9, minimum=0.1)]
     else:
-        if opts.rnn:
+        if opts.rnn:  # multi-symbol game, use RNN
             sender = core.RnnSenderReinforce(
                 sender,
                 vocab_size=opts.vocab_size,
@@ -245,7 +245,7 @@ def main(params, opts=None, train=False):
                 sender_entropy_coeff=opts.sender_entropy_coeff,
                 receiver_entropy_coeff=0,
             )
-        else:
+        else:  # single-symbol game
             sender = core.ReinforceWrapper(sender)
             receiver = core.ReinforceDeterministicWrapper(receiver)
             game = core.SymbolGameReinforce(
