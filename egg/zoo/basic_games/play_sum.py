@@ -29,18 +29,17 @@ def get_params(params):
     parser.add_argument(
         "--validation_data", type=str, default=None, help="Path to the validation data"
     )
-    # (the following is only used in the reco game)
     parser.add_argument(
         "--n_attributes",
         type=int,
         default=None,
-        help="Number of attributes in Sender input (must match data set, and it is only used in reco game)",
+        help="Number of attributes (operands in the sum game) in Sender input (default: 2)",
     )
     parser.add_argument(
         "--n_values",
         type=int,
         default=None,
-        help="Number of values for each attribute (must match data set)",
+        help="Number of values for each attribute (operand)",
     )
     parser.add_argument(
         "--validation_batch_size",
@@ -134,6 +133,8 @@ def get_params(params):
     return args
 
 
+# allowing to pass either parsed or unparsed parameters, and whether we want to train or only create the game.
+# this is so that we can load the game in a Jupyter notebook by calling main()
 def main(params, opts=None, train=False):
     if not opts:
         opts = get_params(params)
